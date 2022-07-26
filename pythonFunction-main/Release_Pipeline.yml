@@ -1,0 +1,266 @@
+name: Python-App_HelloApp_$(Artefact_Version)_$(date:yyyyMMdd)
+
+trigger: none
+
+variables:
+  project_name: 'Python-App'
+  build_pipeline: 'raghuram-koripalli-1.pythonFunction'
+  artifact_name: 'HelloApp'
+  azure_subscription: 'Free Trial(72226166-4bbd-423e-b4c9-578f2fa7b5b6)'
+  function_app_name_st: 'dev-raghu-hello-app'
+  function_app_name_sit: 'sit-raghu-hello-app'
+  function_app_name_uat: 'uat-raghu-hello-app'
+  function_app_name_prod: 'prod-raghu-hello-app'
+
+
+
+stages:
+- stage: System_Test
+  displayName: 'System Test'
+  jobs:
+  - deployment: ST_Deployment
+    displayName: deploy HelloAPP in ST Environment  
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'ST'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Downlaod Artefact from Reposirory
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'specific'
+              project: $(project_name)
+              pipeline: $(build_pipeline)
+              buildVersionToDownload: 'specific'
+              buildId: $(Artefact_Version)
+              downloadType: 'single'
+              artifactName: $(artifact_name)
+              downloadPath: '$(System.ArtifactsDirectory)'
+          # Deploy the artefact downloaded    
+          - task: AzureFunctionApp@1
+            displayName: ST Deployment
+            inputs:
+              azureSubscription: '$(azure_subscription)'
+              appType: 'functionApp'
+              appName: $(function_app_name_st)
+              package: '$(System.ArtifactsDirectory)/**/*.zip'
+              deploymentMethod: 'auto'
+          # Execute smoke tests part of Post Deployment Verification
+          - script: echo Running smoke Tests forPost deployment verification
+            displayName: 'Execute Smoke tests '
+
+
+  - job: System_Testing
+    displayName: 'Execute System Testing'
+    dependsOn: ST_Deployment
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      # Execute System Tests part of Continuous Testing 
+    - script: echo Running System Tests
+      displayName: 'System Test Execution'
+
+    # Step returns sucess/failure basedon validating  System Testing results against ST quality gate
+    - script: echo Running test results against ST quality criteria
+      displayName: 'ST Test qualification to proceed to next environment'
+
+     # step will notify users if Quality gates are not met  
+    - template: templates/include-notification-steps.yml
+      parameters:
+        taskName: System Testing Report
+        notification:  Result status with testing report
+        status: false
+      condition: failed()
+
+     # Step will notify users if Quality gate are met  
+    - template: templates/include-notification-steps.yml
+      parameters:
+        taskName: System Testing Report
+        notification:  Result status with testing report
+
+    # Step to get ST signoff from Tech Lead - thsis can be manual intervation/automated task based on maturity of the team 
+    - script: echo ST Signoffstep waiting for approvals using manual inervention/ jira/azure boards 
+      displayName: 'ST Signoff '
+
+
+
+- stage: SIT
+  displayName: 'System Integration Test'
+  jobs:
+  - deployment: SIT_Deployment
+    displayName: deploy HelloAPP in SIT Environment  
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'SIT'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Downlaod Artefact from Reposirory
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'specific'
+              project: $(project_name)
+              pipeline: $(build_pipeline)
+              buildVersionToDownload: 'specific'
+              buildId: $(Artefact_Version)
+              downloadType: 'single'
+              artifactName: $(artifact_name)
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          # Deploy the artefact downloaded
+          - task: AzureFunctionApp@1
+            displayName: SIT Deployment
+            inputs:
+              azureSubscription: '$(azure_subscription)'
+              appType: 'functionApp'
+              appName: $(function_app_name_sit)
+              package: '$(System.ArtifactsDirectory)/**/*.zip'
+              deploymentMethod: 'auto'
+          
+          # Execute smoke tests part of Post Deployment Verification
+          - script: echo Running smoke Tests forPost deployment verification
+            displayName: 'Execute Smoke tests '
+
+
+  - job: E2E_Testing
+    displayName: 'Execute End to End Testing'
+    dependsOn: SIT_Deployment
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    # Execute  E2E Tests
+    - script: echo Running E2E Tests
+      displayName: 'SIT Test Execution'
+
+    # Below step will return sucess/failure by validating System Testing results against SIT quality gate
+    - script: echo Running test results against SIT quality criteria
+      displayName: 'SIT Test qualification to proceed to next environment'
+
+     # Below step will notify users when Quality gates are not  met  
+    - template: templates/include-notification-steps.yml
+      parameters:
+        taskName: E2E Testing Report
+        notification:  Result status with testing report
+        status: false
+      condition: failed()
+
+     # Below step will notfy users when Quality gates are met 
+    - template: templates/include-notification-steps.yml
+      parameters:
+        taskName: E2E Testing  Report
+        notification:  Result status with testing report
+
+    # Step to get SIT signoff from Test Lead - thsis can be manual intervation/automated task based on maturity of the team 
+    - script: echo SIT Signoffstep waiting for approvals using manual inervention/ jira/azure boards 
+      displayName: 'SIT Signoff '
+
+
+- stage: UAT
+  displayName: 'UAT / OAT Environment'
+  jobs:
+  - deployment: UAT_Deployment
+    displayName: deploy HelloAPP in UAT Environment  
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'UAT'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Downlaod Artefact from Reposirory
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'specific'
+              project: $(project_name)
+              pipeline: $(build_pipeline)
+              buildVersionToDownload: 'specific'
+              buildId: $(Artefact_Version)
+              downloadType: 'single'
+              artifactName: $(artifact_name)
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          # Deploy the artefact downloaded
+          - task: AzureFunctionApp@1
+            displayName: UAT Deployment
+            inputs:
+              azureSubscription: '$(azure_subscription)'
+              appType: 'functionApp'
+              appName: $(function_app_name_uat)
+              package: '$(System.ArtifactsDirectory)/**/*.zip'
+              deploymentMethod: 'auto'
+
+            # Execute smoke tests part of Post Deployment Verification
+          - script: echo Running smoke Tests forPost deployment verification
+            displayName: 'Execute Smoke tests '
+
+
+  - job: UAT_Testing
+    displayName: 'UAT Testing'
+    dependsOn: UAT_Deployment
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: echo Running UAT Tests
+      displayName: 'UAT Execution'
+    
+    # step to wait for signoff
+    - script: echo UAT and OAT Signoff by business
+      displayName: 'UAT Approvals' 
+
+    # step to raise change management request in ServiceNow
+    - script: echo Raise CR in Service Now
+      displayName: 'SIT Test qualification to proceed to next environment'
+
+    - script: echo UAT and OAT Signoff by Delivery and CAB Teams 
+      displayName: 'UAT Approvals'
+
+- stage: Prod
+  displayName: 'Prod Deployment'
+  jobs:
+  - deployment: prod_Deployment
+    displayName: deploy HelloAPP in Prod Environment  
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'UAT'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Wait for Change Request approval
+          - script: echo Wait for CR approval 
+            displayName: 'CR Approvals'
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'specific'
+              project: $(project_name)
+              pipeline: $(build_pipeline)
+              buildVersionToDownload: 'specific'
+              buildId: $(Artefact_Version)
+              downloadType: 'single'
+              artifactName: $(artifact_name)
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          # Deploy the artefact downloaded
+          - task: AzureFunctionApp@1
+            displayName: Prod Deployment
+            inputs:
+              azureSubscription: '$(azure_subscription)'
+              appType: 'functionApp'
+              appName: $(function_app_name_prod)
+              package: '$(System.ArtifactsDirectory)/**/*.zip'
+              deploymentMethod: 'auto'
+
+            # Execute smoke tests part of Post Deployment Verification
+          - script: echo Running smoke Tests for Post deployment verification
+            displayName: 'Execute Smoke tests '
+           
+           # Supporting Business  Checkout activities
+          - script: echo Supporting Business Checkout
+            displayName: 'Support Business Checkout'
+          
+          # Go Live sign off task
+          - script: echo Release signoff with updated to ServiceNow
+            displayName: 'Signoff'

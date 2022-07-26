@@ -1,0 +1,16 @@
+# File: Notification yml to notify users 
+parameters:
+- name: taskName # name of the notofication task
+  type: string # data type of the parameter; required
+  default: true
+- name: notification # name of the notofication task
+  type: string # data type of the parameter; required
+  default: true 
+- name: status # name of the parameter; required
+  type: boolean # data type of the parameter; required
+  default: true  
+
+steps:
+- script: echo ${{ parameters.taskName }} ${{ parameters.notification }}
+- script: exit 1
+  condition: eq('${{ parameters.status }}', false)

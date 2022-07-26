@@ -1,0 +1,56 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+variables:
+  function_app_name: 'HelloApp'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.6'
+    addToPath: true
+    architecture: 'x64'
+
+- script: ls -lrt
+  displayName: 'Run a one-line script'
+
+- task: SonarCloudPrepare@1
+  inputs:
+    SonarCloud: 'Sonar Cloud Azure Connection'
+    organization: 'raghuram-test'
+    scannerMode: 'CLI'
+    configMode: 'manual'
+    cliProjectKey: 'HelloWorld-Func'
+    cliProjectName: 'HelloWorld-Func'
+    cliSources: '.'
+    extraProperties: |
+      # Additional properties that will be passed to the scanner, 
+      # Put one key=value per line, example:
+      #sonar.exclusions=**/*.json
+
+- task: SonarCloudAnalyze@1
+
+- task: SonarCloudPublish@1
+  inputs:
+    pollingTimeoutSec: '300'
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: "$(System.DefaultWorkingDirectory)/$(function_app_name)"
+    includeRootFolder: true
+    archiveType: 'zip'
+    archiveFile: "$(System.DefaultWorkingDirectory)/build$(Build.BuildId).zip"
+    replaceExistingArchive: true
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: "$(System.DefaultWorkingDirectory)/build$(Build.BuildId).zip"
+    ArtifactName: $(function_app_name)
+
